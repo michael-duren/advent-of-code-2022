@@ -1,161 +1,117 @@
-// oponent has three choices
-// enum OpenentChoice {
+use std::str::FromStr;
 
-// }
+use color_eyre::eyre::Result;
 
-struct ResultPoints {
-    win: u8,
-    draw: u8,
-    lose: u8,
+#[derive(Debug, Clone, Copy)]
+enum Move {
+    Rock,
+    Paper,
+    Scissors,
 }
 
-impl Default for ResultPoints {
-    fn default() -> Self {
-        ResultPoints {
-            win: 6,
-            draw: 3,
-            lose: 0,
-        }
-    }
-}
-
-enum OpponentChoice {
-    A, // rock
-    B, // paper
-    C, // scissors
-}
-
-impl OpponentChoice {
-    fn from_char(c: &char) -> Option<Self> {
-        match c {
-            'A' => Some(OpponentChoice::A),
-            'B' => Some(OpponentChoice::B),
-            'C' => Some(OpponentChoice::C),
-            _ => None,
-        }
-    }
-}
-
-enum YourChoice {
-    X, // rock
-    Y, // paper
-    Z, // scissors
-}
-
-impl YourChoice {
-    fn from_char(c: &char) -> Option<Self> {
-        match c {
-            'X' => Some(YourChoice::X),
-            'Y' => Some(YourChoice::Y),
-            'Z' => Some(YourChoice::Z),
-            _ => None,
-        }
-    }
-}
-
-struct ChoicePoints {
-    x: u8,
-    y: u8,
-    z: u8,
-}
-
-impl Default for ChoicePoints {
-    fn default() -> Self {
-        ChoicePoints { x: 1, y: 2, z: 3 }
-    }
-}
-
+#[derive(Debug, Clone, Copy)]
 struct Round {
-    your_choice: YourChoice,
-    opponent_choice: OpponentChoice,
-    round_num: u64,
+    theirs: Move,
+    ours: Move,
 }
 
 impl Round {
-    fn desired_outcome(round_num: u64) -> &'static str {
-        match round_num {
-            1 => "draw",
-            2 => "lose",
-            3 => "win",
-            _ => panic!("Invalid round number"),
-        }
+    fn outcome(self) -> Outcome {
+        self.ours.outcome(self.theirs)
     }
-
-    fn optimal_choice(outcome: &str, opponent_choice: &OpponentChoice) -> YourChoice {
-        match outcome {
-            "draw" => match opponent_choice {
-                OpponentChoice::A => YourChoice::X,
-                OpponentChoice::B => YourChoice::Y,
-                OpponentChoice::C => YourChoice::Z,
-            },
-            "lose" => match opponent_choice {
-                OpponentChoice::A => YourChoice::Z,
-                OpponentChoice::B => YourChoice::X,
-                OpponentChoice::C => YourChoice::Y,
-            },
-            "win" => match opponent_choice {
-                OpponentChoice::A => YourChoice::Y,
-                OpponentChoice::B => YourChoice::Z,
-                OpponentChoice::C => YourChoice::X,
-            },
-            _ => panic!("Invalid outcome"),
-        }
+    fn our_score(self) -> usize {
+        self.ours.inherit_points() + self.outcome().inherent_points()
     }
+}
 
-    fn play_round(&self) -> u8 {
-        let result_points = ResultPoints::default();
-        let choice_points = ChoicePoints::default();
-        match &self.opponent_choice {
-            OpponentChoice::A => match &self.your_choice {
-                YourChoice::X => return result_points.draw + choice_points.x,
-                YourChoice::Y => return result_points.win + choice_points.y,
-                YourChoice::Z => return result_points.lose + choice_points.z,
-            },
-            OpponentChoice::B => match &self.your_choice {
-                YourChoice::X => return result_points.lose + choice_points.x,
-                YourChoice::Y => return result_points.draw + choice_points.y,
-                YourChoice::Z => return result_points.win + choice_points.z,
-            },
-            OpponentChoice::C => match &self.your_choice {
-                YourChoice::X => return result_points.win + choice_points.x,
-                YourChoice::Y => return result_points.lose + choice_points.y,
-                YourChoice::Z => return result_points.draw + choice_points.z,
-            },
+impl TryFrom<char> for Move {
+    type Error = color_eyre::Report;
+
+    fn try_from(c: char) -> Result<Self, Self::Error> {
+        match c {
+            'A' | 'X' => Ok(Move::Rock),
+            'B' | 'Y' => Ok(Move::Paper),
+            'C' | 'Z' => Ok(Move::Scissors),
+            _ => Err(color_eyre::eyre::eyre!("not a valid move: {c:?}")),
         }
     }
 }
 
-fn main() {
-    let file = "test_input.txt";
-    let file2 = "input.txt";
-    let input = std::fs::read_to_string(&file2).expect(&format!("File '{}' does not exist", file));
-    let mut score: u64 = 0;
-    let mut round_num: u64 = 1;
+impl FromStr for Round {
+    type Err = color_eyre::Report;
 
-    for round in input.lines() {
-        let opponent_guess_char = round.chars().nth(0).unwrap();
-        let opponent_guess = OpponentChoice::from_char(&opponent_guess_char)
-            .expect("Expected Opponent Choice to be A B or C");
-
-        let desired = Round::desired_outcome(round_num);
-        let your_choice = Round::optimal_choice(desired, &opponent_guess);
-
-        let current_round = Round {
-            opponent_choice: opponent_guess,
-            your_choice,
-            round_num,
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut chars = s.chars();
+        let (Some(theirs), Some(' '), Some(ours), None) = (chars.next(), chars.next(), chars.next(), chars.next()) else {
+            return Err(color_eyre::eyre::eyre!("expected <theirs>SP<ours>EOF, got {s:?}"));
         };
 
-        if round_num < 3 {
-            round_num += 1;
-        } else {
-            round_num = 1;
-        }
+        Ok(Self {
+            theirs: theirs.try_into()?,
+            ours: ours.try_into()?,
+        })
+    }
+}
 
-        let round_result = current_round.play_round();
-        println!("round: {}, result: {}", round_num, round_result);
-        score += round_result as u64;
+impl Move {
+    fn inherit_points(self) -> usize {
+        match self {
+            Move::Rock => 1,
+            Move::Paper => 2,
+            Move::Scissors => 3,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Outcome {
+    Win,
+    Draw,
+    Loss,
+}
+
+impl Outcome {
+    fn inherent_points(self) -> usize {
+        match self {
+            Outcome::Win => 6,
+            Outcome::Draw => 3,
+            Outcome::Loss => 0,
+        }
+    }
+}
+
+impl Move {
+    fn beats(self, other: Move) -> bool {
+        matches!(
+            (self, other),
+            (Self::Rock, Self::Scissors)
+                | (Self::Paper, Self::Rock)
+                | (Self::Scissors, Self::Paper)
+        )
     }
 
-    println!("{score}");
+    fn outcome(self, theirs: Move) -> Outcome {
+        if self.beats(theirs) {
+            Outcome::Win
+        } else if theirs.beats(self) {
+            Outcome::Loss
+        } else {
+            Outcome::Draw
+        }
+    }
+}
+
+fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
+
+    let total_score: usize = iter_tools::process_results(
+        include_str!("input.txt")
+            .lines()
+            .map(Round::from_str)
+            .map(|r| r.map(|r| r.our_score())),
+        |it| it.sum(),
+    )?;
+    dbg!(total_score);
+
+    Ok(())
 }
