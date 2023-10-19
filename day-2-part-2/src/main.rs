@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::str::FromStr;
 
 use color_eyre::eyre::Result;
@@ -24,15 +25,29 @@ impl Round {
     }
 }
 
+// Mood parser
 impl TryFrom<char> for Move {
     type Error = color_eyre::Report;
 
     fn try_from(c: char) -> Result<Self, Self::Error> {
         match c {
-            'A' | 'X' => Ok(Move::Rock),
-            'B' | 'Y' => Ok(Move::Paper),
-            'C' | 'Z' => Ok(Move::Scissors),
+            'A' => Ok(Move::Rock),
+            'B' => Ok(Move::Paper),
+            'C' => Ok(Move::Scissors),
             _ => Err(color_eyre::eyre::eyre!("not a valid move: {c:?}")),
+        }
+    }
+}
+
+impl TryFrom<char> for Outcome {
+    type Error = color_eyre::Report;
+
+    fn try_from(c: char) -> Result<Self, Self::Error> {
+        match c {
+            'X' => Ok(Outcome::Loss),
+            'Y' => Ok(Outcome::Draw),
+            'Z' => Ok(Outcome::Win),
+            _ => Err(color_eyre::eyre::eyre!("not a valid outcome: {c:?}")),
         }
     }
 }
@@ -42,14 +57,15 @@ impl FromStr for Round {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut chars = s.chars();
-        let (Some(theirs), Some(' '), Some(ours), None) = (chars.next(), chars.next(), chars.next(), chars.next()) else {
+        let (Some(theirs), Some(' '), Some(outcome), None) = (chars.next(), chars.next(), chars.next(), chars.next()) else {
             return Err(color_eyre::eyre::eyre!("expected <theirs>SP<ours>EOF, got {s:?}"));
         };
 
-        Ok(Self {
-            theirs: theirs.try_into()?,
-            ours: ours.try_into()?,
-        })
+        let theirs = Move::try_from(theirs)?;
+        let outcome = Outcome::try_from(outcome)?;
+        let ours = outcome.matching_move(theirs);
+
+        Ok(Self { theirs, ours })
     }
 }
 
@@ -63,11 +79,35 @@ impl Move {
     }
 }
 
+impl Move {
+    const ALL_MOVES: [Move; 3] = [Move::Rock, Move::Paper, Move::Scissors];
+
+    fn winning_move(self) -> Self {
+        Self::ALL_MOVES
+            .iter()
+            .copied()
+            .find(|m| m.beats(self))
+            .expect("at least one move beatus us")
+    }
+
+    fn losing_move(self) -> Self {
+        Self::ALL_MOVES
+            .iter()
+            .copied()
+            .find(|&m| self.beats(m))
+            .expect("we beat at least one move")
+    }
+
+    fn drawing_move(self) -> Self {
+        self
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum Outcome {
-    Win,
-    Draw,
     Loss,
+    Draw,
+    Win,
 }
 
 impl Outcome {
@@ -76,6 +116,16 @@ impl Outcome {
             Outcome::Win => 6,
             Outcome::Draw => 3,
             Outcome::Loss => 0,
+        }
+    }
+}
+
+impl Outcome {
+    fn matching_move(self, theirs: Move) -> Move {
+        match self {
+            Outcome::Win => theirs.winning_move(),
+            Outcome::Draw => theirs.drawing_move(),
+            Outcome::Loss => theirs.losing_move(),
         }
     }
 }
@@ -104,11 +154,11 @@ impl Move {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
 
-    let total_score: usize = iter_tools::process_results(
+    let total_score: usize = itertools::process_results(
         include_str!("input.txt")
             .lines()
             .map(Round::from_str)
-            .map(|r| r.map(|r| r.our_score())),
+            .map_ok(|r| r.our_score()),
         |it| it.sum(),
     )?;
     dbg!(total_score);
