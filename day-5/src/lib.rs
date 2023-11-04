@@ -21,15 +21,10 @@ pub fn run(lines: core::str::Lines<'_>) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    println!("Rows before rotation: {:?}", rows);
-
     // rotate rows
     let mut rotated_rows = rotate_rows(rows);
 
-    println!("{:?}", rotated_rows);
-
     for instruction in instructions {
-        println!("{:?}", rotated_rows);
         let result = move_crates(&mut rotated_rows, &instruction);
 
         match result {
@@ -41,40 +36,46 @@ pub fn run(lines: core::str::Lines<'_>) -> Result<(), Box<dyn Error>> {
         }
     }
 
+    print_top_crates(&rotated_rows);
+
     return Ok(());
+}
+
+fn print_top_crates(rows: &Vec<Vec<char>>) {
+    let mut top_crates = vec![];
+
+    for row in rows.iter() {
+        let top_crate = row.last().unwrap();
+        top_crates.push(top_crate);
+    }
+    println!("{:?}", top_crates);
 }
 
 fn move_crates(rows: &mut Vec<Vec<char>>, instruction: &Instruction) -> Result<(), &'static str> {
     for _ in 0..instruction.total {
+        let from = instruction.from - 1;
+        let to = instruction.to - 1;
 
-        // if let Some(item) = rows[instruction.from].pop() {
-        //     println!("Item is being moved. Item: {}", item);
-        //     rows[instruction.to].push(item);
-        // } else {
-        //     return Err("Error moving crates");
-        // }
+        let crate_to_move = rows[from].pop().unwrap(); // remove crate
+        rows[to].push(crate_to_move); // add crate
     }
-
     return Ok(());
 }
 
 fn rotate_rows(rows: Vec<Vec<char>>) -> Vec<Vec<char>> {
-    let longest_row: usize = rows.iter().max_by_key(|x| x.len()).unwrap().len(); // find the length of the longest row
+    let max_row_len = rows.iter().map(|row| row.len()).max().unwrap();
+    let mut transposed_rows: Vec<Vec<char>> = vec![Vec::new(); max_row_len];
 
-    let mut transposed_rows: Vec<Vec<char>> = vec![Vec::new(); rows.len()];
-    println!("Transposed Rows Empty: {:?}", transposed_rows);
-
+    // transpose
     for row in rows.iter().rev() {
         for (i, &c) in row.iter().enumerate() {
             transposed_rows[i].push(c);
         }
-        // for (i, c) in row.iter().enumerate() {
-        //     transposed_rows[i].push(*c);
-        // }
+    }
 
-        // for i in row.len()..longest_row {
-        //     transposed_rows[i].push(' ');
-        // }
+    // remove white space
+    for row in transposed_rows.iter_mut() {
+        row.retain(|&c| c != ' ');
     }
 
     return transposed_rows;
@@ -111,7 +112,7 @@ impl FromStr for Instruction {
         });
 
         if instruction_nums.len() != 3 {
-            println!("Error parsing instruction: {:?}", instruction_nums);
+            eprintln!("Error parsing instruction: {:?}", instruction_nums);
             return Err(ParseInstructionError);
         }
 
