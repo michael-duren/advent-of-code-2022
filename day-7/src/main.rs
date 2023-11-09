@@ -1,3 +1,5 @@
+use day_7::run;
+
 fn main() {
-    println!("Hello, world!");
+    run();
 }
