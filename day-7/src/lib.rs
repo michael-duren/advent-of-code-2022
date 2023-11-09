@@ -1,17 +1,53 @@
-use std::str::Lines;
+use std::{collections::HashSet, process, str::Lines};
 
 use regex::Regex;
 
 pub fn run() {
-    println!("Hello, world!");
+    let commands = include_str!("../input").lines();
+
+    let result = find_small_directories(commands);
+
+    println!("Result is: {:?}", result);
+}
+
+#[derive(Debug)]
+struct Directory {
+    name: String,
+    files: Vec<usize>,
+    directories: Vec<String>,
+}
+
+impl Directory {
+    fn new(name: String) -> Self {
+        Self {
+            name,
+            files: vec![],
+            directories: vec![],
+        }
+    }
 }
 
 pub fn find_small_directories(lines: Lines<'_>) -> usize {
     let file_re = Regex::new(r"\d+(\s|\w|.)+").unwrap();
-    let mut dir_content: Vec<Vec<usize>> = vec![];
+    let cd_re = Regex::new(r"^\$\scd\s+.+").unwrap();
+    let mut dirs: Vec<Directory> = vec![];
 
-    for line in lines {
-        if file_re.is_match(line) {
+    // get dirs contents
+    for (i, line) in lines.enumerate() {
+        if cd_re.is_match(line) && !line.contains("..") {
+            // create new dir
+            let dir_name: &str = line
+                .split_whitespace()
+                .collect::<Vec<&str>>()
+                .get(2)
+                .unwrap_or_else(|| {
+                    eprintln!("Error parsing line: {}", line);
+                    process::exit(1);
+                });
+
+            let directory = Directory::new(String::from(dir_name));
+            dirs.push(directory);
+        } else if file_re.is_match(line) {
             let mut str_num = String::from("");
 
             for c in line.chars() {
@@ -25,27 +61,76 @@ pub fn find_small_directories(lines: Lines<'_>) -> usize {
             // parse file size
             let file_size = str_num.parse::<usize>().unwrap();
 
-            // if we were previously in a dir then push to current
-            let current_len = dir_content.len() - 1;
-            dir_content[current_len].push(file_size);
+            // push into last created dir
+            if let Some(last_dir) = dirs.last_mut() {
+                last_dir.files.push(file_size);
+            } else {
+                eprintln!(
+                    "Error finding last dir line: {}, line number: {}",
+                    line,
+                    (i + 1)
+                );
+                process::exit(1);
+            }
             continue;
-        }
+        } else if line.contains("dir") {
+            let dir_name: &str = line
+                .split_whitespace()
+                .collect::<Vec<&str>>()
+                .get(1)
+                .unwrap_or_else(|| {
+                    eprintln!("Error parsing line: {}. Line number: {}", line, (i + 1));
+                    process::exit(1);
+                });
 
-        if line.contains("ls") {
-            dir_content.push(vec![]);
+            if let Some(last_dir) = dirs.last_mut() {
+                last_dir.directories.push(String::from(dir_name));
+            } else {
+                eprintln!(
+                    "Error finding last dir line: {}, line number: {}",
+                    line,
+                    (i + 1)
+                );
+                process::exit(1);
+            }
         }
     }
 
     let mut result: usize = 0;
 
-    for dir in dir_content {
-        let dir_total = dir.into_iter().sum::<usize>();
-        if dir_total < 100000 {
+    for dir in &dirs {
+        println!("Dir: {:?}", dir);
+        let mut visited: HashSet<String> = HashSet::new();
+        let dir_total = sum_dir(dir, &dirs, 0, &mut visited);
+        if dir_total <= 100000 {
             result += dir_total;
         }
     }
 
     result
+}
+
+fn sum_dir(
+    dir: &Directory,
+    dir_list: &[Directory],
+    mut total: usize,
+    visited: &mut HashSet<String>,
+) -> usize {
+    if visited.contains(&dir.name) {
+        return total;
+    }
+
+    visited.insert(dir.name.clone());
+
+    total += dir.files.iter().sum::<usize>();
+
+    for d in &dir.directories {
+        if let Some(next_dir) = dir_list.iter().find(|dr| &dr.name == d) {
+            total = sum_dir(next_dir, dir_list, total, visited);
+        }
+    }
+
+    total
 }
 
 #[cfg(test)]
