@@ -1,34 +1,33 @@
 pub fn run() {
-    println!("Hello, world!");
+    let s = include_str!("../input");
+
+    let result = first_marker(s);
+
+    match result {
+        Some(i) => println!("{}", i),
+        None => eprintln!("Error Parsing"),
+    }
 }
 
-pub fn first_marker(string: &str) -> Option<i32> {
-    let string = String::from(string);
+pub fn is_unique_str(string: &str) -> bool {
+    let mut chars = string.chars().collect::<Vec<char>>();
+    chars.sort();
+    chars.dedup();
 
-    for (i, c) in string.chars().enumerate() {
-        // if we cannot go past 4 characters ahead break
-        if i + 4 > string.len() {
-            break;
-        }
+    chars.len() == string.len()
+}
 
-        // check if the next 4 characters are the same
-        for j in 1..4 {
-            print!("{}", string.chars().nth(i + j).unwrap());
-            if j == 3 {
-                return Some(i as i32);
-            }
+pub fn first_marker(string: &str) -> Option<usize> {
+    let s = String::from(string);
 
-            if c != string.chars().nth(i + j).unwrap() {
-                continue;
-            }
-
-            if c == string.chars().nth(i + j).unwrap() {
-                break;
-            }
+    for (i, _) in string.chars().enumerate() {
+        let current_slice = &s[i..i + 4];
+        if is_unique_str(current_slice) {
+            return Some(i + 4);
         }
     }
 
-    return None;
+    None
 }
 
 #[cfg(test)]
