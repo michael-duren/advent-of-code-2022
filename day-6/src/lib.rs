@@ -21,9 +21,10 @@ pub fn first_marker(string: &str) -> Option<usize> {
     let s = String::from(string);
 
     for (i, _) in string.chars().enumerate() {
-        let current_slice = &s[i..i + 4];
+        // updated to part 2
+        let current_slice = &s[i..i + 14];
         if is_unique_str(current_slice) {
-            return Some(i + 4);
+            return Some(i + 14);
         }
     }
 
@@ -38,7 +39,7 @@ mod tests {
     fn test_for_five() {
         // arrange
         let s = "bvwbjplbgvbhsrlpgdmjqwftvncz";
-        let expected = 5;
+        let expected = 23;
 
         // act
         let actual = first_marker(s).unwrap();
@@ -51,7 +52,7 @@ mod tests {
     fn test_for_six() {
         // arrange
         let s = "nppdvjthqldpwncqszvftbrmjlhg";
-        let expected = 6;
+        let expected = 23;
 
         // act
         let actual = first_marker(s).unwrap();
